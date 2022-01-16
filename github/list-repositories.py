@@ -10,7 +10,7 @@ import sys
 #   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
-def query_api_repositories_for_names(github_account, page, repositories):
+def query_api_repositories(github_account, page, repositories):
     url = f"https://api.github.com/orgs/{github_account}/repos?page={page}"
 
     response = requests.get(url)
@@ -18,18 +18,27 @@ def query_api_repositories_for_names(github_account, page, repositories):
         raise RuntimeError(
             f"HTTP error {response.status_code}: {response.text}")
 
-    new_repositories = [repo["name"] for repo in response.json()]
+    new_repositories = response.json()
 
     if len(new_repositories) == 0:
         # We've all of them.
         return repositories
 
-    return query_api_repositories_for_names(
+    return query_api_repositories(
         github_account, page + 1, repositories + new_repositories)
 
 
-def get_all_repositories_names(github_account):
-    return query_api_repositories_for_names(github_account, 1, [])
+def get_all_repositories(github_account):
+    return query_api_repositories(github_account, 1, [])
+
+
+def print_repository(repository_info, options):
+    line = repository_info["name"]
+
+    if options["with_branch"]:
+        line += f",{repository_info['default_branch']}"
+
+    print(line)
 
 
 #   -------------------------------------------------------------
@@ -37,14 +46,22 @@ def get_all_repositories_names(github_account):
 #   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
-def run(github_account):
-    for repository in get_all_repositories_names(github_account):
-        print(repository)
+def run(github_account, options):
+    for repository in get_all_repositories(github_account):
+        print_repository(repository, options)
 
 
 if __name__ == "__main__":
+    options = {
+        "with_branch": False,
+    }
+
     try:
-        run(sys.argv[1])
+        for extra_arg in sys.argv[2:]:
+            if extra_arg == '-b':
+                options["with_branch"] = True
+
+        run(sys.argv[1], options)
     except IndexError:
         print("Usage:", sys.argv[0], "<GitHub org account>", file=sys.stderr)
         sys.exit(2)
